@@ -6,7 +6,7 @@
   "functions": {
     "api/heal.py": {
       "maxDuration": 60,
-      "includeFiles": "{healloop/**,examples/broken/**}"
+      "includeFiles": "{healloop/**,examples/broken/**,web/**}"
     }
   },
   "routes": [

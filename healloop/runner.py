@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -136,6 +137,28 @@ def _extract_failures(stdout: str, stderr: str) -> list[FailureRecord]:
     return failures
 
 
+def _subprocess_env() -> dict[str, str]:
+    """Give the pytest child the same import path as this process.
+
+    Vercel injects site-packages onto ``sys.path`` inside the function process.
+    A bare ``sys.executable -m pytest`` does not see that path unless it is
+    copied into ``PYTHONPATH``.
+    """
+    env = os.environ.copy()
+    parts: list[str] = []
+    seen: set[str] = set()
+    existing = env.get("PYTHONPATH", "")
+    for entry in [*sys.path, existing]:
+        for piece in str(entry).split(os.pathsep):
+            if piece and piece not in seen:
+                seen.add(piece)
+                parts.append(piece)
+    env["PYTHONPATH"] = os.pathsep.join(parts)
+    # Same-length fixture edits must not be masked by a stale .pyc.
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return env
+
+
 def run_pytest(
     target: str | Path,
     *,
@@ -169,6 +192,7 @@ def run_pytest(
         capture_output=True,
         text=True,
         check=False,
+        env=_subprocess_env(),
     )
     stdout = proc.stdout or ""
     stderr = proc.stderr or ""

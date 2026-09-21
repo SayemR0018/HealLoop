@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""HealLoop agentic tool surface for GPT-6 (run_pytest / read_slice / submit_fix_plan)."""
+
 import json
 from pathlib import Path
 from typing import Any, Callable
@@ -200,4 +202,4 @@ def execute_tool(
     except ToolError as exc:
         return json.dumps({"error": str(exc)})
     except Exception as exc:  # noqa: BLE001 — surface to model as tool error
-        return json.dumps({"error": f"{type(exc).__name__}: {exc}"})
+        return json.dumps({"error": f"{type(exc).__name__}: {exc}")

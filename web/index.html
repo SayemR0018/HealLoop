@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HealLoop — mock heal</title>
+    <meta
+      name="description"
+      content="Visit-and-try shell for HealLoop. One click runs the mock closed-loop heal on examples/broken and prints the Scorecard."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <span class="mark" aria-hidden="true">HL</span>
+        <div>
+          <p class="kicker">Python CLI · mock shell</p>
+          <h1>HealLoop</h1>
+        </div>
+      </div>
+      <a class="github" href="https://github.com/SayemR0018/HealLoop">
+        github.com/SayemR0018/HealLoop
+      </a>
+    </header>
+
+    <main>
+      <section class="pitch">
+        <p>
+          Failing pytest becomes a structured FixPlan, a sandboxed unified
+          diff, and a re-run until the Scorecard is green. The product is the
+          Python CLI. This page only visits that loop in mock mode.
+        </p>
+        <p class="fixture">
+          Target <code>examples/broken</code> — <code>add</code> returns
+          <code>a - b</code>. One click: fail, FixPlan, apply, green. No API
+          key is sent from the browser.
+        </p>
+        <button id="run" type="button">Run mock heal</button>
+        <p id="status-line" class="status-line" role="status"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="scorecard-heading">
+        <div class="panel-bar">
+          <h2 id="scorecard-heading">Scorecard</h2>
+          <ol class="steps" id="steps">
+            <li data-step="fail">fail</li>
+            <li data-step="fix" aria-label="FixPlan">fix</li>
+            <li data-step="green">green</li>
+          </ol>
+        </div>
+        <p id="error" class="error" role="alert" hidden></p>
+        <pre id="scorecard" class="scorecard" aria-live="polite">Scorecard JSON appears here.</pre>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

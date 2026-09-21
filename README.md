@@ -51,6 +51,25 @@ HEALLOOP_MOCK=1 python -m healloop run examples/broken
 
 The intentional bug in `examples/broken/buggy_math.py` (`return a - b`) is patched to `return a + b` and tests pass.
 
+## Live demo
+
+Visit the mock-only shell: [https://YOUR-PROJECT.vercel.app](https://YOUR-PROJECT.vercel.app)
+
+The page is a visit-and-try shell. One button runs the same closed loop as the CLI against `examples/broken` and prints the Scorecard. The Python CLI stays the product. Nothing on that deployment calls live GPT-6: `api/heal.py` forces `HEALLOOP_MOCK=1` and discards `OPENAI_API_KEY` before HealLoop is imported.
+
+In the Vercel project settings, set this environment variable for Production, Preview, and Development:
+
+```text
+HEALLOOP_MOCK=1
+```
+
+Deploy from the repo root (the function also forces mock mode if the variable is missing):
+
+```bash
+vercel
+vercel --prod
+```
+
 ## Live GPT-6
 
 ```bash

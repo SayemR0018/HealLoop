@@ -14,11 +14,22 @@ import tempfile
 import traceback
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
+from urllib.parse import unquote
 
 _ROOT = Path(__file__).resolve().parent.parent
+_WEB_ROOT = (_ROOT / "web").resolve()
 _FIXTURE_FILES = ("buggy_math.py", "test_buggy_math.py")
 _INTENTIONAL_BUG = "return a - b"
 _MAX_BODY_BYTES = 1_048_576
+_HEAL_PATHS = {"/api/heal", "/api/heal.py"}
+_STATIC_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+    ".json": "application/json; charset=utf-8",
+}
 
 
 def _refuse_live_openai() -> None:
@@ -40,8 +51,33 @@ def _ensure_package_path() -> None:
 _refuse_live_openai()
 _ensure_package_path()
 
+import pytest  # noqa: E402, F401  — keep pytest in the Vercel function bundle
 from healloop.loop import run_loop  # noqa: E402
 from healloop.schemas import LoopStatus, Scorecard  # noqa: E402
+
+_last_pytest: dict[str, object] = {"code": None, "text": ""}
+
+
+def _capture_pytest_output() -> None:
+    """Remember the last pytest subprocess output for a failed mock heal."""
+    import healloop.runner as runner_mod
+
+    if getattr(runner_mod.run_pytest, "_healloop_capture", False):
+        return
+    original = runner_mod.run_pytest
+
+    def wrapped(*args, **kwargs):
+        result = original(*args, **kwargs)
+        text = f"{result.stdout or ''}\n{result.stderr or ''}".strip()
+        _last_pytest["code"] = result.exit_code
+        _last_pytest["text"] = text[-1500:]
+        return result
+
+    wrapped._healloop_capture = True  # type: ignore[attr-defined]
+    runner_mod.run_pytest = wrapped
+
+
+_capture_pytest_output()
 
 
 def _stage_fixture() -> Path:
@@ -100,15 +136,60 @@ def _json_bytes(payload: str) -> bytes:
     return payload.encode("utf-8")
 
 
+def _request_path(raw: str) -> str:
+    """Return the URL path without query, fragment, or a trailing slash."""
+    path = unquote(raw.split("?", 1)[0].split("#", 1)[0])
+    if len(path) > 1:
+        path = path.rstrip("/")
+    return path or "/"
+
+
+def _is_heal_path(path: str) -> bool:
+    return path in _HEAL_PATHS
+
+
+def _static_file(path: str) -> Path | None:
+    """Map `/` and `/styles.css` (also `/web/...`) onto files under web/."""
+    rel = "index.html" if path == "/" else path.lstrip("/")
+    if rel.startswith("web/"):
+        rel = rel[len("web/") :]
+    if not rel or rel.endswith("/"):
+        return None
+    candidate = (_WEB_ROOT / rel).resolve()
+    if not candidate.is_relative_to(_WEB_ROOT) or not candidate.is_file():
+        return None
+    return candidate
+
+
 class handler(BaseHTTPRequestHandler):
-    """Vercel Python entrypoint (`handler` + BaseHTTPRequestHandler)."""
+    """Vercel Python entrypoint (`handler` + BaseHTTPRequestHandler).
+
+    The Python runtime routes every request to this entrypoint, so `/`
+    serves the static shell from ``web/`` and only ``/api/heal`` runs the
+    mock loop. ``vercel.json`` routes stay in place for the same split.
+    """
 
     def do_GET(self) -> None:
-        self._respond_heal()
+        path = _request_path(self.path)
+        if _is_heal_path(path):
+            self._respond_heal()
+            return
+        self._respond_static(path)
 
     def do_POST(self) -> None:
         self._discard_body()
+        path = _request_path(self.path)
+        if not _is_heal_path(path):
+            self._send(404, _json_bytes(json.dumps({"error": "not found"})))
+            return
         self._respond_heal()
+
+    def do_HEAD(self) -> None:
+        self._head_only = True
+        try:
+            self.do_GET()
+        finally:
+            self._head_only = False
 
     def do_OPTIONS(self) -> None:
         self._send(204, b"")
@@ -140,18 +221,39 @@ class handler(BaseHTTPRequestHandler):
             f"iterations={card.iterations} passed={card.passed}",
             flush=True,
         )
-        self._send(200, _json_bytes(card.model_dump_json(indent=2)))
+        payload = json.loads(card.model_dump_json())
+        if not card.passed:
+            payload["pytest_exit"] = _last_pytest.get("code")
+            payload["pytest_output"] = _last_pytest.get("text")
+            print(payload["pytest_output"], flush=True)
+        self._send(200, _json_bytes(json.dumps(payload, indent=2)))
 
-    def _send(self, status: int, body: bytes) -> None:
+    def _respond_static(self, path: str) -> None:
+        target = _static_file(path)
+        if target is None:
+            self._send(404, _json_bytes(json.dumps({"error": "not found"})))
+            return
+        body = target.read_bytes()
+        content_type = _STATIC_TYPES.get(target.suffix.lower(), "application/octet-stream")
+        self._send(200, body, content_type=content_type, cache="public, max-age=300")
+
+    def _send(
+        self,
+        status: int,
+        body: bytes,
+        *,
+        content_type: str = "application/json; charset=utf-8",
+        cache: str = "no-store",
+    ) -> None:
         self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", cache)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
-        if body:
+        if body and not getattr(self, "_head_only", False):
             self.wfile.write(body)
 
 

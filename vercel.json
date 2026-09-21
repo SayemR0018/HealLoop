@@ -1,0 +1,33 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "env": {
+    "HEALLOOP_MOCK": "1"
+  },
+  "functions": {
+    "api/heal.py": {
+      "maxDuration": 60,
+      "includeFiles": "{healloop/**,examples/broken/**}"
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/heal",
+      "methods": ["GET", "POST", "OPTIONS"],
+      "dest": "/api/heal.py",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "src": "/",
+      "dest": "/web/index.html"
+    },
+    {
+      "src": "/((?!api/).+)",
+      "dest": "/web/$1"
+    }
+  ]
+}

@@ -1,22 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "version": 2,
   "env": {
     "HEALLOOP_MOCK": "1"
   },
-  "builds": [
-    {
-      "src": "web/**/*",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "api/heal.py",
-      "use": "@vercel/python",
-      "config": {
-        "includeFiles": "{healloop/**,examples/broken/**}"
-      }
+  "functions": {
+    "api/heal.py": {
+      "maxDuration": 60,
+      "includeFiles": "{healloop/**,examples/broken/**}"
     }
-  ],
+  },
   "routes": [
     {
       "src": "/api/heal",

@@ -57,6 +57,8 @@ Visit the mock-only shell: [https://YOUR-PROJECT.vercel.app](https://YOUR-PROJEC
 
 The page is a visit-and-try shell. One button runs the same closed loop as the CLI against a temp copy of `examples/broken` and prints the Scorecard. The Python CLI stays the product. The Vercel deployment is mock-only: the function forces `HEALLOOP_MOCK=1` and does not call a live model.
 
+On Vercel, only set `HEALLOOP_MOCK=1`. Do not set `OPENAI_API_KEY`.
+
 Manual project settings:
 
 | Setting | Value |
@@ -64,7 +66,7 @@ Manual project settings:
 | Framework preset | Other |
 | Root directory | `.` |
 | Build command | empty |
-| Environment variable | `HEALLOOP_MOCK=1` (Production, Preview, and Development) |
+| Environment variable | Only set `HEALLOOP_MOCK=1` (Production, Preview, and Development) |
 
 Deploy from the repo root:
 
